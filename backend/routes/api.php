@@ -6,9 +6,42 @@ use App\Http\Controllers\Api\OutletController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\EmployeeController;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/setup-super-admin', function (Illuminate\Http\Request $request) {
+    $key = config('app.super_admin_setup_key');
 
+    if (!$key || !hash_equals($key, (string) $request->header('X-Setup-Key'))) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    if (User::where('role', 'super_admin')->exists()) {
+        return response()->json(['message' => 'Super Admin already exists'], 409);
+    }
+
+    $data = $request->validate([
+        'name' => 'required|string|max:100',
+        'email' => 'required|email|max:150',
+        'password' => 'required|string|min:12',
+    ]);
+
+    $user = User::create([
+        'name' => $data['name'],
+        'email' => $data['email'],
+        'password' => Hash::make($data['password']),
+        'role' => 'super_admin',
+        'outlet_ids' => [],
+        'is_active' => true,
+    ]);
+
+    return response()->json([
+        'message' => 'Super Admin created',
+        'id' => (string) $user->id,
+        'email' => $user->email,
+    ], 201);
+});
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
