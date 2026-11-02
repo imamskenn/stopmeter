@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Support\ActivityLogger;
 
 class OutletController extends Controller
 {
@@ -34,6 +35,12 @@ class OutletController extends Controller
         $data['is_active'] = true;
 
         $outlet = Outlet::create($data);
+        ActivityLogger::log(
+    'outlet.created',
+    'outlet',
+    $outlet->id,
+    "Outlet {$outlet->name} berhasil dibuat."
+);
 
         return response()->json([
             'message' => 'Outlet berhasil dibuat.',
@@ -84,7 +91,13 @@ class OutletController extends Controller
         }
 
         $outlet->update($data);
-
+        ActivityLogger::log(
+    'outlet.updated',
+    'outlet',
+    $outlet->id,
+    "Outlet {$outlet->name} diperbarui.",
+    ['changes' => $data]
+);
         return response()->json([
             'message' => 'Outlet berhasil diperbarui.',
             'data' => $outlet->fresh(),
@@ -101,7 +114,12 @@ class OutletController extends Controller
 
         // Nonaktifkan outlet, jangan hapus data historis.
         $outlet->update(['is_active' => false]);
-
+         ActivityLogger::log(
+    'outlet.deactivated',
+    'outlet',
+    $outlet->id,
+    "Outlet {$outlet->name} dinonaktifkan."
+);
         return response()->json([
             'message' => 'Outlet berhasil dinonaktifkan.',
         ]);

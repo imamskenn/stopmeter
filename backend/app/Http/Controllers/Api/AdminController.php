@@ -8,6 +8,7 @@ use App\Models\Outlet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Support\ActivityLogger;
 
 class AdminController extends Controller
 {
@@ -52,6 +53,12 @@ class AdminController extends Controller
             'outlet_ids' => $outletIds,
             'is_active' => true,
         ]);
+ActivityLogger::log(
+    'admin.created',
+    'admin',
+    $admin->id,
+    "Admin {$admin->name} berhasil dibuat."
+);
 
         return response()->json([
             'message' => 'Admin berhasil dibuat.',
@@ -121,7 +128,13 @@ class AdminController extends Controller
         }
 
         $admin->update($data);
-
+ActivityLogger::log(
+    'admin.updated',
+    'admin',
+    $admin->id,
+    "Admin {$admin->name} diperbarui.",
+    ['changes' => array_diff_key($data, ['password' => true])]
+);
         return response()->json([
             'message' => 'Admin berhasil diperbarui.',
             'data' => $admin->fresh(),
@@ -139,6 +152,12 @@ class AdminController extends Controller
         }
 
         $admin->update(['is_active' => false]);
+ActivityLogger::log(
+    'admin.deactivated',
+    'admin',
+    $admin->id,
+    "Admin {$admin->name} dinonaktifkan."
+);
 
         return response()->json([
             'message' => 'Admin berhasil dinonaktifkan.',

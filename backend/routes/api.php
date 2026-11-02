@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\OutletController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\SuperAdminDashboardController;
+use App\Http\Controllers\Api\SuperAdminActivityController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -17,7 +18,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:super_admin')
         ->group(function () {
             Route::get('/dashboard', [SuperAdminDashboardController::class, 'index']);
-
+            Route::get('/activities', [SuperAdminActivityController::class, 'index']);
             Route::apiResource('outlets', OutletController::class);
             Route::apiResource('admins', AdminController::class);
         });
