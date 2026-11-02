@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OutletController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\EmployeeController;
+use Illuminate\Support\Facades\DB;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -30,4 +31,20 @@ Route::middleware('auth:sanctum')->group(function () {
         ->group(function () {
             Route::apiResource('employees', EmployeeController::class);
         });
+});
+
+Route::get('/test-db', function () {
+    try {
+        DB::connection('mongodb')->getMongoDB()->listCollections();
+
+        return response()->json([
+            'status' => 'connected',
+            'database' => config('database.connections.mongodb.database'),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
 });
