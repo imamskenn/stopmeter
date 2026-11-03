@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\SuperAdminDashboardController;
 use App\Http\Controllers\Api\SuperAdminActivityController;
 use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\StopmeterController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -28,6 +29,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:admin')
         ->group(function () {
             Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+        });
+
+
+    Route::prefix('stopmeters')
+        ->middleware('role:super_admin,admin,employee')
+        ->group(function () {
+            Route::get('/', [StopmeterController::class, 'index']);
+            Route::get('/{id}', [StopmeterController::class, 'show']);
         });
 
     Route::prefix('management')
