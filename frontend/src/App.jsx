@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from './lib/api';
 
+
 const initialOutlets = [
   { id: 'OUT-001', name: 'Outlet Utama', city: 'Petaling Jaya', status: 'Aktif', admins: 2, staff: 8 },
   { id: 'OUT-002', name: 'Outlet Selatan', city: 'Shah Alam', status: 'Aktif', admins: 1, staff: 5 },
@@ -487,6 +488,55 @@ function AdminDashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [selected, setSelected] = useState(null);
+  const [modalClosing, setModalClosing] = useState(false);
+
+  const closeDetail = () => {
+    setModalClosing(true);
+    setTimeout(() => {
+      setSelected(null);
+      setModalClosing(false);
+    }, 220);
+  };
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptCategory, setReceiptCategory] = useState('');
+  const [receiptAmount, setReceiptAmount] = useState('');
+  const [receiptHistory, setReceiptHistory] = useState([]);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+
+  const [activities, setActivities] = useState([
+    {
+      id: 'DEMO-001',
+      employee: 'Employee Demo 1',
+      outlet: 'Outlet Demo',
+      session: 'Pagi',
+      status: 'On Working',
+      sales: 1250,
+      time: new Date()
+    },
+    {
+      id: 'DEMO-002',
+      employee: 'Employee Demo 2',
+      outlet: 'Outlet Demo',
+      session: 'Malam',
+      status: 'On Working',
+      sales: 850,
+      time: new Date(Date.now() - 60000)
+    },
+    {
+      id: 'DEMO-003',
+      employee: 'Employee Demo 3',
+      outlet: 'Outlet Demo',
+      session: 'Pagi',
+      status: 'Already',
+      sales: 2100,
+      time: new Date(Date.now() - 120000)
+    }
+  ]);
 
   useEffect(() => {
     apiRequest('/admin/dashboard')
@@ -494,6 +544,51 @@ function AdminDashboard({ user, onLogout }) {
       .catch(err => setError(err.message || 'Gagal memuat dashboard.'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const sortedActivities = [...activities].sort((a, b) => {
+    const priority = status => status === 'Already' ? 0 : 1;
+    return priority(a.status) - priority(b.status)
+      || new Date(b.time) - new Date(a.time);
+  });
+
+  const money = value =>
+    new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: 'MYR'
+    }).format(value || 0);
+
+  const stats = [
+    ['Total Outlet', data?.outlets?.total ?? 0],
+    ['Outlet Aktif', data?.outlets?.active ?? 0],
+    ['Total Employee', data?.employees?.total ?? 0],
+    ['Employee Aktif', data?.employees?.active ?? 0],
+  ];
+
+  const card = {
+    background: '#fff',
+    border: '1px solid #e8eaf0',
+    borderRadius: 14,
+    padding: 18,
+    boxShadow: '0 3px 12px #00000006'
+  };
+
+  const statusStyle = status => ({
+    display: 'inline-block',
+    padding: '5px 10px',
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 800,
+    background: status === 'On Working' ? '#dcfce7' : '#dbeafe',
+    color: status === 'On Working' ? '#15803d' : '#1d4ed8'
+  });
 
   if (loading) return <div style={{ padding: 30 }}>Memuat Admin Dashboard...</div>;
 
@@ -505,38 +600,436 @@ function AdminDashboard({ user, onLogout }) {
     </div>
   );
 
-  const stats = [
-    ['Total Outlet', data?.outlets?.total ?? 0],
-    ['Outlet Aktif', data?.outlets?.active ?? 0],
-    ['Total Employee', data?.employees?.total ?? 0],
-    ['Employee Aktif', data?.employees?.active ?? 0],
-  ];
-
   return (
-    <main style={{ minHeight: '100vh', background: '#f5f6fa', padding: 24, boxSizing: 'border-box' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+    <main style={{
+      minHeight: '100vh',
+      background: '#f4f6fa',
+      padding: 22,
+      boxSizing: 'border-box',
+      color: '#172033'
+    }}>
+      <header style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 14,
+        marginBottom: 26
+      }}>
         <div>
-          <h1 style={{ margin: 0 }}>STOPMETER</h1>
-          <p style={{ color: '#777' }}>Admin Control Center</p>
-          <strong>{user.name}</strong>
+          <h1 style={{
+            margin: 0,
+            fontSize: 32,
+            fontWeight: 800,
+            letterSpacing: -1,
+            color: '#172033'
+          }}>Hello, {user?.name || 'Admin'}!</h1>
+          <p style={{
+            color: '#68758b',
+            margin: '7px 0 0',
+            fontSize: 17,
+            fontWeight: 500
+          }}>Operasionalkan tim-mu</p>
         </div>
-        <button onClick={onLogout} style={{ padding: '10px 18px', border: 0, borderRadius: 8, background: '#dc2626', color: 'white' }}>
-          Logout
-        </button>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{
+              position: 'relative',
+              padding: '11px 15px',
+              border: '1px solid #e2e5ec',
+              borderRadius: 9,
+              background: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            Notifikasi
+            {activities.length > 0 && (
+              <span style={{
+                marginLeft: 7,
+                background: '#dc2626',
+                color: '#fff',
+                borderRadius: 20,
+                padding: '2px 7px',
+                fontSize: 11
+              }}>{activities.length}</span>
+            )}
+          </button>
+          <button
+            onClick={onLogout}
+            style={{
+              padding: '11px 17px',
+              border: 0,
+              borderRadius: 9,
+              background: '#dc2626',
+              color: '#fff',
+              cursor: 'pointer'
+            }}
+          >Logout</button>
+        </div>
       </header>
 
-      <h2>Ringkasan</h2>
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-        {stats.map(([label, value]) => (
-          <article key={label} style={{ background: 'white', padding: 20, borderRadius: 12, boxShadow: '0 2px 10px #00000008' }}>
-            <p style={{ color: '#777', margin: 0 }}>{label}</p>
-            <strong style={{ fontSize: 30 }}>{value}</strong>
+      <nav style={{
+        display: 'flex',
+        gap: 8,
+        marginBottom: 16,
+        borderBottom: '1px solid #e5e9f0',
+        paddingBottom: 10
+      }}>
+        {[
+          ['home', 'Home'],
+          ['receipt', 'Resit']
+        ].map(([tab, label]) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              border: 0,
+              borderRadius: 9,
+              padding: '9px 16px',
+              background: activeTab === tab ? '#172f59' : '#fff',
+              color: activeTab === tab ? '#fff' : '#526078',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >{label}</button>
+        ))}
+      </nav>
+
+      {activeTab === 'home' && (
+      <>
+      <section style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 145px), 1fr))',
+        gap: 10,
+        marginBottom: 18
+      }}>
+        {[
+          { label: 'Saldo Inch​​as', value: money(5000), note: 'Saldo demo', color: '#2563eb', icon: '↗' },
+          { label: 'Total Outlet', value: data?.outlets?.total ?? 0, note: 'Outlet terdaftar', color: '#0f766e', icon: '⌂' },
+          { label: 'Total Pekerja', value: data?.employees?.total ?? 0, note: 'Seluruh pekerja', color: '#7c3aed', icon: '♙' },
+          { label: 'Total Harus Disetor', value: money(1250), note: 'Nilai demo', color: '#d97706', icon: '⇩' }
+        ].map(item => (
+          <article key={item.label} style={{
+            ...card,
+            border: 0,
+            borderRadius: 14,
+            padding: 12,
+            minHeight: 88,
+            boxShadow: '0 3px 12px #17203308'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#778196', fontSize: 12, fontWeight: 650 }}>{item.label}</span>
+              <span style={{
+                width: 27, height: 27, borderRadius: 9,
+                display: 'grid', placeItems: 'center',
+                background: `${item.color}14`, color: item.color,
+                fontSize: 16, fontWeight: 800
+              }}>{item.icon}</span>
+            </div>
+            <div style={{ fontSize: 'clamp(16px, 4.5vw, 21px)', fontWeight: 850, marginTop: 8, letterSpacing: '-.5px', overflowWrap: 'anywhere' }}>{item.value}</div>
+            <small style={{ color: '#9aa1ad' }}>{item.note}</small>
           </article>
         ))}
       </section>
 
-      <section style={{ marginTop: 28, background: 'white', padding: 20, borderRadius: 12 }}>
-        <h2>Outlet Saya</h2>
+      <section style={{ ...card, border: 0, borderRadius: 16, padding: 14 }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', gap: 8, marginBottom: 12
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 16 }}>Aktivitas Terbaru</h2>
+            <p style={{ margin: '5px 0 0', color: '#8991a0', fontSize: 12 }}>
+              Aktivitas operasional seluruh outlet
+            </p>
+          </div>
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{
+              border: 0, background: '#eef2ff', color: '#4657a5',
+              borderRadius: 9, padding: '8px 10px', fontSize: 12,
+              fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap'
+            }}
+          >{showNotifications ? 'Tutup' : 'Lihat semua'}</button>
+        </div>
+
+        {!showNotifications ? (
+          <div style={{ position: 'relative', height: 160, cursor: 'pointer' }}>
+            {sortedActivities.slice(0, 3).map((item, index) => (
+              <article
+                key={item.id}
+                onClick={() => setSelected(item)}
+                className="stop-activity-card"
+                style={{
+                  position: 'absolute',
+                  top: index * 13,
+                  left: index * 5,
+                  right: index * 5,
+                  zIndex: 3 - index,
+                  minHeight: 108,
+                  boxSizing: 'border-box',
+                  background: '#fff',
+                  border: '1px solid #e8eaf0',
+                  borderRadius: 17,
+                  padding: 17,
+                  boxShadow: '0 7px 22px #17203312',
+                  transform: `scale(${1 - index * 0.025})`,
+                  transformOrigin: 'top center',
+                  transition: 'all 300ms ease'
+                }}
+              >
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr auto',
+                  alignItems: 'start',
+                  gap: 8
+                }}>
+                  <strong style={{ fontSize: 14 }}>{item.employee}</strong>
+                  <strong style={{ fontSize: 13, color: '#526078' }}>{item.outlet}</strong>
+                  <div style={{ textAlign: 'right' }}>
+                    <strong style={{ fontSize: 12 }}>
+                      {new Date(item.time).toLocaleDateString('ms-MY')}
+                    </strong>
+                    <div style={{ fontSize: 11, color: '#8991a0', marginTop: 4 }}>
+                      {item.session}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <span style={statusStyle(item.status)}>{item.status}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: 18 }}>{money(item.sales)}</strong>
+                  <small style={{ color: '#8991a0' }}>
+                    {new Date(item.time).toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' })}
+                  </small>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {sortedActivities.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setSelected(item)}
+                style={{
+                  textAlign: 'left', background: '#f8f9fc',
+                  border: '1px solid #edf0f5', borderRadius: 14,
+                  padding: 15, cursor: 'pointer', color: '#172033'
+                }}
+              >
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr auto',
+                  alignItems: 'start',
+                  gap: 8
+                }}>
+                  <strong style={{ fontSize: 13 }}>{item.employee}</strong>
+                  <strong style={{ fontSize: 12, color: '#526078' }}>{item.outlet}</strong>
+                  <div style={{ textAlign: 'right' }}>
+                    <strong style={{ fontSize: 11 }}>
+                      {new Date(item.time).toLocaleDateString('ms-MY')}
+                    </strong>
+                    <div style={{ fontSize: 11, color: '#8991a0', marginTop: 4 }}>
+                      {item.session}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 9 }}>
+                  <span style={statusStyle(item.status)}>{item.status}</span>
+                  <small style={{ marginLeft: 8, color: '#8991a0' }}>{item.id}</small>
+                </div>
+                <strong>{money(item.sales)}</strong>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {selected && (
+        <section
+          onClick={closeDetail}
+          className={`stop-modal-overlay${modalClosing ? ' closing' : ''}`}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(15, 23, 42, 0.48)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            boxSizing: 'border-box'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className={`stop-modal-panel${modalClosing ? ' closing' : ''}`}
+            style={{
+              ...card,
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              borderRadius: 22,
+              padding: 20,
+              boxSizing: 'border-box',
+              position: 'relative'
+            }}
+          >
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 10
+          }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Detail Stopmeter</h2>
+              <p style={{ color: '#8991a0', fontSize: 12 }}>
+                {selected.id} · {selected.outlet}
+              </p>
+            </div>
+            <button className="stop-soft-button" onClick={closeDetail}
+              style={{
+                border: 0,
+                background: '#f0f2f6',
+                borderRadius: 10,
+                padding: '10px 14px',
+                cursor: 'pointer'
+              }}>Tutup</button>
+          </div>
+
+          <div style={{
+            background: '#f6f8fc',
+            borderRadius: 14,
+            padding: 15,
+            marginBottom: 18
+          }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr auto',
+              alignItems: 'start',
+              gap: 8
+            }}>
+              <strong style={{ fontSize: 13 }}>{selected.employee}</strong>
+              <strong style={{ fontSize: 12, color: '#526078' }}>{selected.outlet}</strong>
+              <div style={{ textAlign: 'right' }}>
+                <strong style={{ fontSize: 11 }}>
+                  {new Date(selected.time).toLocaleDateString('ms-MY')}
+                </strong>
+                <div style={{ fontSize: 11, color: '#8991a0', marginTop: 4 }}>
+                  {selected.session}
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <span style={statusStyle(selected.status)}>{selected.status}</span>
+              <small style={{ marginLeft: 8, color: '#8991a0' }}>{selected.id}</small>
+            </div>
+          </div>
+
+          <h3 style={{ fontSize: 14 }}>METER CALCULATION</h3>
+          <div style={{
+            background: '#f6f8fc',
+            borderRadius: 14,
+            padding: 15
+          }}>
+            {[
+              ['R', '1,000 − 500', '500'],
+              ['M', '1,000 − 500', '500']
+            ].map(([label, formula, total]) => (
+              <div key={label} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '9px 0'
+              }}>
+                <strong>{label}</strong>
+                <span style={{ color: '#778196' }}>{formula}</span>
+                <strong>{total}</strong>
+              </div>
+            ))}
+            <div style={{
+              borderTop: '1px solid #dce2eb',
+              marginTop: 7,
+              paddingTop: 13,
+              display: 'flex',
+              justifyContent: 'space-between'
+            }}>
+              <strong>Total Limit</strong>
+              <strong>1,000</strong>
+            </div>
+          </div>
+
+          <h3 style={{ fontSize: 14, marginTop: 22 }}>RECORD TOTAL</h3>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #edf0f5',
+            borderRadius: 14,
+            padding: '5px 15px'
+          }}>
+            {[
+              ['BI', '−100'],
+              ['DP', '+500'],
+              ['Inch In', '+200'],
+              ['Inch Out', '−50'],
+              ['VC', '−10']
+            ].map(([label, value]) => (
+              <div key={label} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '13px 0',
+                borderBottom: '1px solid #f0f2f6'
+              }}>
+                <span style={{ color: '#778196' }}>Total {label}</span>
+                <strong style={{
+                  color: value.startsWith('+') ? '#16865c' :
+                    value.startsWith('−') ? '#dc6262' : '#172033'
+                }}>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            background: '#edf5ff',
+            borderRadius: 16,
+            padding: 18,
+            marginTop: 18
+          }}>
+            <span style={{
+              color: '#5274a8',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: 1
+            }}>FINAL SALES</span>
+            <div style={{
+              fontSize: 30,
+              fontWeight: 850,
+              color: '#244e87',
+              marginTop: 5
+            }}>RM 1,540</div>
+            <p style={{
+              fontSize: 11,
+              color: '#6680a4',
+              marginBottom: 0
+            }}>
+              1,000 − 100 + 500 + 200 − 50 − 10
+            </p>
+          </div>
+          <p style={{ color: '#9aa1ad', fontSize: 11 }}>
+            Contoh perhitungan simulasi frontend.
+          </p>
+          </div>
+        </section>
+      )}
+
+      <section style={{ ...card, marginTop: 25 }}>
+        <h2 style={{ marginTop: 0 }}>Outlet Saya</h2>
         {(data?.outlet_list || []).length === 0 ? (
           <p>Belum ada outlet yang ditugaskan.</p>
         ) : (
@@ -564,6 +1057,303 @@ function AdminDashboard({ user, onLogout }) {
           </div>
         )}
       </section>
+      </>
+      )}
+
+      {activeTab === 'receipt' && (
+        <section style={{
+          ...card,
+          maxWidth: 600,
+          margin: '0 auto',
+          padding: 16,
+          border: 0
+        }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 19 }}>Tambah Resit</h2>
+          <p style={{ margin: '0 0 18px', color: '#778196', fontSize: 12 }}>
+            Catat pengeluaran dan lampirkan foto resit.
+          </p>
+
+          <form onSubmit={e => {
+            e.preventDefault();
+            if (!receiptFile || !receiptCategory || !receiptAmount) return;
+
+            setReceiptHistory(previous => [{
+              id: Date.now(),
+              category: receiptCategory,
+              amount: Number(receiptAmount),
+              fileName: receiptFile.name,
+              imageUrl: URL.createObjectURL(receiptFile),
+              date: new Date()
+            }, ...previous]);
+
+            setReceiptFile(null);
+            setReceiptCategory('');
+            setReceiptAmount('');
+            e.target.reset();
+          }}>
+            <div style={{
+              border: '1px dashed #aab4c4',
+              borderRadius: 12,
+              padding: 18,
+              textAlign: 'center',
+              marginBottom: 16
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>＋</div>
+              <strong style={{ fontSize: 13 }}>Foto resit wajib</strong>
+              <p style={{ color: '#8991a0', fontSize: 11 }}>
+                Ambil foto atau pilih dari galeri
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <label style={{
+                  padding: 12,
+                  borderRadius: 9,
+                  background: '#172f59',
+                  color: '#fff',
+                  textAlign: 'center',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}>
+                  Ambil Foto
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={e => setReceiptFile(e.target.files?.[0] || null)}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <label style={{
+                  padding: 12,
+                  borderRadius: 9,
+                  background: '#eaf0f8',
+                  color: '#172f59',
+                  textAlign: 'center',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}>
+                  Pilih Galeri
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setReceiptFile(e.target.files?.[0] || null)}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+              {receiptFile && (
+                <p style={{ fontSize: 12, color: '#16865c' }}>
+                  {receiptFile.name}
+                </p>
+              )}
+            </div>
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
+              Kategori pengeluaran
+            </label>
+            <select
+              required
+              value={receiptCategory}
+              onChange={e => setReceiptCategory(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 12,
+                margin: '7px 0 16px',
+                border: '1px solid #dce1e9',
+                borderRadius: 9,
+                background: '#fff',
+                boxSizing: 'border-box'
+              }}
+            >
+              <option value="">Pilih kategori</option>
+              {['Makanan', 'Transportasi', 'Barang', 'Sakit', 'Operasional'].map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
+              Total pengeluaran (RM)
+            </label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              value={receiptAmount}
+              onChange={e => setReceiptAmount(e.target.value)}
+              placeholder="Masukkan total resit"
+              style={{
+                width: '100%',
+                padding: 12,
+                margin: '7px 0 10px',
+                border: '1px solid #dce1e9',
+                borderRadius: 9,
+                boxSizing: 'border-box'
+              }}
+            />
+
+            <p style={{
+              fontSize: 11,
+              color: '#68758b',
+              marginBottom: 16
+            }}>
+              Nominal resit diisi manual sesuai jumlah pada foto.
+            </p>
+
+            <button
+              type="submit"
+              style={{
+                width: '100%',
+                padding: 13,
+                border: 0,
+                borderRadius: 10,
+                background: '#172f59',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >Simpan catatan resit</button>
+          </form>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: 15 }}>Riwayat Resit</h3>
+            {receiptHistory.length === 0 ? (
+              <p style={{ color: '#8991a0', fontSize: 12 }}>
+                Belum ada catatan resit.
+              </p>
+            ) : receiptHistory.map(item => (
+              <div key={item.id}
+                onClick={() => setSelectedReceipt(item)}
+                style={{
+                  padding: 12,
+                  border: '1px solid #e8eaf0',
+                  borderRadius: 10,
+                  marginBottom: 8,
+                  cursor: 'pointer'
+                }}>
+                <strong>{item.category}</strong>
+                <div style={{ fontSize: 13, marginTop: 5 }}>
+                  {money(item.amount)}
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: 7
+                }}>
+                  <small style={{
+                    color: '#8991a0',
+                    overflowWrap: 'anywhere'
+                  }}>{item.fileName}</small>
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (window.confirm('Hapus catatan resit ini?')) {
+                        setReceiptHistory(previous =>
+                          previous.filter(receipt => receipt.id !== item.id)
+                        );
+                      }
+                    }}
+                    style={{
+                      border: '1px solid #fecaca',
+                      background: '#fff1f2',
+                      color: '#dc2626',
+                      borderRadius: 7,
+                      padding: '6px 10px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >Hapus</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {selectedReceipt && (
+            <div
+              onClick={() => setSelectedReceipt(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 1000,
+                background: '#101828bb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 16
+              }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: '#fff',
+                  width: '100%',
+                  maxWidth: 480,
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  borderRadius: 15,
+                  padding: 14,
+                  boxSizing: 'border-box'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12
+                }}>
+                  <strong>Preview Resit</strong>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReceipt(null)}
+                    style={{
+                      border: 0,
+                      background: '#f1f3f6',
+                      borderRadius: 8,
+                      padding: '7px 11px',
+                      cursor: 'pointer'
+                    }}
+                  >Tutup</button>
+                </div>
+
+                <img
+                  src={selectedReceipt.imageUrl}
+                  alt="Foto resit"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    maxHeight: '60vh',
+                    objectFit: 'contain',
+                    borderRadius: 9,
+                    background: '#f4f6fa'
+                  }}
+                />
+
+                <div style={{ marginTop: 14 }}>
+                  <strong>{selectedReceipt.category}</strong>
+                  <div style={{
+                    fontSize: 20,
+                    fontWeight: 800,
+                    marginTop: 5
+                  }}>{money(selectedReceipt.amount)}</div>
+                  <small style={{ color: '#8991a0' }}>
+                    {selectedReceipt.date.toLocaleString('ms-MY')}
+                  </small>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <p style={{ color: '#9aa1ad', fontSize: 11, marginTop: 16 }}>
+            Tampilan frontend. Pengiriman ke Super Admin dan pemotongan deposit belum aktif.
+          </p>
+        </section>
+      )}
+
     </main>
   );
 }
