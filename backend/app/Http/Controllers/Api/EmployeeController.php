@@ -10,12 +10,45 @@ use Illuminate\Support\Facades\Hash;
 
 class EmployeeController extends Controller
 {
+    private function canManageEmployee($actor, $employee): bool
+    {
+        if ($actor->role === 'super_admin') {
+            return true;
+        }
+
+        $allowed = array_map('strval', $actor->outlet_ids ?? []);
+        $assigned = array_map('strval', $employee->outlet_ids ?? []);
+
+        // Employee tanpa outlet tidak boleh dikelola Admin.
+        if (empty($assigned)) {
+            return false;
+        }
+
+        // Seluruh outlet Employee harus berada dalam kewenangan Admin.
+        return empty(array_diff($assigned, $allowed));
+    }
+
     public function index(Request $request)
     {
         $query = User::where('role', 'employee');
 
         if ($request->user()->role === 'admin') {
-            $query->whereIn('outlet_ids', $request->user()->outlet_ids ?? []);
+            $allowed = array_map(
+                'strval',
+                $request->user()->outlet_ids ?? []
+            );
+
+            $employees = $query->get()->filter(function ($employee) use ($allowed) {
+                $assigned = array_map(
+                    'strval',
+                    $employee->outlet_ids ?? []
+                );
+
+                return !empty($assigned)
+                    && empty(array_diff($assigned, $allowed));
+            })->values();
+
+            return response()->json(['data' => $employees]);
         }
 
         return response()->json(['data' => $query->get()]);
@@ -32,28 +65,32 @@ class EmployeeController extends Controller
         ]);
 
         if (User::where('email', $data['email'])->exists()) {
-            return response()->json(['message' => 'Email sudah digunakan.'], 422);
+            return response()->json([
+                'message' => 'Email sudah digunakan.'
+            ], 422);
         }
 
         $outletIds = array_values(array_unique($data['outlet_ids']));
         $actor = $request->user();
+
+        if ($actor->role === 'admin') {
+            $allowed = array_map('strval', $actor->outlet_ids ?? []);
+
+            if (!empty(array_diff($outletIds, $allowed))) {
+                return response()->json([
+                    'message' => 'Akses outlet ditolak.'
+                ], 403);
+            }
+        }
 
         $outlets = Outlet::whereIn('_id', $outletIds)
             ->where('is_active', true)
             ->get();
 
         if ($outlets->count() !== count($outletIds)) {
-            return response()->json(['message' => 'Outlet tidak valid atau nonaktif.'], 422);
-        }
-
-        if ($actor->role === 'admin') {
-            $allowed = $actor->outlet_ids ?? [];
-
-            foreach ($outletIds as $outletId) {
-                if (!in_array($outletId, $allowed, true)) {
-                    return response()->json(['message' => 'Akses outlet ditolak.'], 403);
-                }
-            }
+            return response()->json([
+                'message' => 'Outlet tidak valid atau nonaktif.'
+            ], 422);
         }
 
         $employee = User::create([
@@ -78,16 +115,17 @@ class EmployeeController extends Controller
             ->first();
 
         if (!$employee) {
-            return response()->json(['message' => 'Employee tidak ditemukan.'], 404);
+            return response()->json([
+                'message' => 'Employee tidak ditemukan.'
+            ], 404);
         }
 
         $actor = $request->user();
 
-        if ($actor->role === 'admin') {
-            $allowed = $actor->outlet_ids ?? [];
-            if (!array_intersect($employee->outlet_ids ?? [], $allowed)) {
-                return response()->json(['message' => 'Akses ditolak.'], 403);
-            }
+        if (!$this->canManageEmployee($actor, $employee)) {
+            return response()->json([
+                'message' => 'Akses ditolak.'
+            ], 403);
         }
 
         $data = $request->validate([
@@ -101,15 +139,24 @@ class EmployeeController extends Controller
         if (isset($data['outlet_ids'])) {
             $ids = array_values(array_unique($data['outlet_ids']));
 
-            if ($actor->role === 'admin' &&
-                array_diff($ids, $actor->outlet_ids ?? [])) {
-                return response()->json(['message' => 'Akses outlet ditolak.'], 403);
+            if ($actor->role === 'admin') {
+                $allowed = array_map('strval', $actor->outlet_ids ?? []);
+
+                if (!empty(array_diff($ids, $allowed))) {
+                    return response()->json([
+                        'message' => 'Akses outlet ditolak.'
+                    ], 403);
+                }
             }
 
-            $count = Outlet::whereIn('_id', $ids)->where('is_active', true)->count();
+            $count = Outlet::whereIn('_id', $ids)
+                ->where('is_active', true)
+                ->count();
 
             if ($count !== count($ids)) {
-                return response()->json(['message' => 'Outlet tidak valid.'], 422);
+                return response()->json([
+                    'message' => 'Outlet tidak valid atau nonaktif.'
+                ], 422);
             }
 
             $data['outlet_ids'] = $ids;
@@ -136,19 +183,21 @@ class EmployeeController extends Controller
             ->first();
 
         if (!$employee) {
-            return response()->json(['message' => 'Employee tidak ditemukan.'], 404);
+            return response()->json([
+                'message' => 'Employee tidak ditemukan.'
+            ], 404);
         }
 
-        if ($request->user()->role === 'admin' &&
-            !array_intersect(
-                $employee->outlet_ids ?? [],
-                $request->user()->outlet_ids ?? []
-            )) {
-            return response()->json(['message' => 'Akses ditolak.'], 403);
+        if (!$this->canManageEmployee($request->user(), $employee)) {
+            return response()->json([
+                'message' => 'Akses ditolak.'
+            ], 403);
         }
 
         $employee->update(['is_active' => false]);
 
-        return response()->json(['message' => 'Employee dinonaktifkan.']);
+        return response()->json([
+            'message' => 'Employee dinonaktifkan.'
+        ]);
     }
 }
