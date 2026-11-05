@@ -7,6 +7,7 @@ use App\Services\StopmeterFinalizer;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreStopmeterRequest extends FormRequest
 {
@@ -39,9 +40,35 @@ class StoreStopmeterRequest extends FormRequest
             'inch_in' => ['sometimes', 'integer', 'min:0'],
             'inch_out' => ['sometimes', 'integer', 'min:0'],
 
+            // Inchas in/out dicatat atas nama admin (Inchas) yang menangani
+            // uangnya. Wajib dipilih kalau nominalnya lebih dari 0.
+            'inch_in_admin_id' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'inch_out_admin_id' => ['sometimes', 'nullable', 'string', 'max:64'],
+
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:128'],
         ];
+    }
+
+    /**
+     * Nominal Inchas in/out tanpa nama admin tidak boleh lolos, karena uangnya
+     * harus bisa ditelusuri ke Inchas yang menangani.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            foreach (['inch_in' => 'Inchas in', 'inch_out' => 'Inchas out'] as $field => $label) {
+                $amount = (int) $this->input($field, 0);
+                $adminId = trim((string) $this->input("{$field}_admin_id", ''));
+
+                if ($amount > 0 && $adminId === '') {
+                    $validator->errors()->add(
+                        "{$field}_admin_id",
+                        "Pilih admin (Inchas) yang menangani {$label}."
+                    );
+                }
+            }
+        });
     }
 
     protected function prepareForValidation(): void
@@ -67,6 +94,8 @@ class StoreStopmeterRequest extends FormRequest
             'm_current.required' => 'Bacaan akhir M wajib diisi.',
             'r_current.min' => 'Bacaan R tidak boleh negatif.',
             'm_current.min' => 'Bacaan M tidak boleh negatif.',
+            'inch_in_admin_id.max' => 'Admin untuk Inchas in tidak valid.',
+            'inch_out_admin_id.max' => 'Admin untuk Inchas out tidak valid.',
         ];
     }
 }
