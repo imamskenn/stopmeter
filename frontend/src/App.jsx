@@ -485,6 +485,8 @@ function Overview({ outlets, admins, setPage, stats, stopmeters = [], stopmeters
     };
   });
 
+  const byBI = [...outletRankings].sort((a, b) => b.biTotal - a.biTotal);
+
   const formatBI = value => new Intl.NumberFormat('id-ID').format(value);
 
   const getOutletBadges = outlet => {
