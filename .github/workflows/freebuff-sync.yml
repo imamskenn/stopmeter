@@ -1,0 +1,39 @@
+name: freebuff-sync
+
+on:
+  push:
+    paths:
+      - '.github/freebuff-sync/apply.py'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Terapkan patch
+        run: |
+          set -euo pipefail
+          if [ -f .github/freebuff-sync/apply.py ]; then
+            python3 .github/freebuff-sync/apply.py
+          else
+            echo "Tidak ada patch untuk diterapkan."
+          fi
+
+      - name: Commit dan push ke main
+        run: |
+          set -euo pipefail
+          git config user.name "Imam S. K"
+          git config user.email "imamskenn@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan."
+            exit 0
+          fi
+          git commit -m "Tangani sesi kedaluwarsa (401) dan beri fallback VITE_API_URL"
+          git push origin HEAD:main
