@@ -10,6 +10,7 @@ use App\Http\Requests\StoreStopmeterRequest;
 use App\Models\Outlet;
 use App\Models\OutletMeterState;
 use App\Models\Stopmeter;
+use App\Models\User;
 use App\Services\StopmeterFinalizer;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -126,6 +127,7 @@ class StopmeterController extends Controller
             return response()->json([
                 'data' => [
                     'outlets' => [],
+                    'admins' => [],
                     'operational_date' => $operationalDate,
                     'sessions' => StopmeterSession::values(),
                 ],
@@ -157,10 +159,41 @@ class StopmeterController extends Controller
         return response()->json([
             'data' => [
                 'outlets' => $rows,
+                // Daftar admin (Inchas) yang bisa dipilih employee saat mengisi
+                // Inchas in/out, lengkap dengan outlet penugasannya.
+                'admins' => $this->assignedAdmins($assigned),
                 'operational_date' => $operationalDate,
                 'sessions' => StopmeterSession::values(),
             ],
         ]);
+    }
+
+    /**
+     * Admin aktif yang ditugaskan pada salah satu outlet milik employee.
+     *
+     * @param  array<int, string>  $outletIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function assignedAdmins(array $outletIds): array
+    {
+        if ($outletIds === []) {
+            return [];
+        }
+
+        return User::where('role', 'admin')
+            ->get()
+            ->filter(static fn (User $admin): bool => $admin->is_active !== false)
+            ->map(function (User $admin): array {
+                return [
+                    'id' => (string) $admin->_id,
+                    'name' => (string) $admin->name,
+                    'outlet_ids' => array_map('strval', $admin->outlet_ids ?? []),
+                ];
+            })
+            ->filter(static fn (array $admin): bool => $admin['outlet_ids'] !== [])
+            ->filter(static fn (array $admin): bool => ! empty(array_intersect($admin['outlet_ids'], $outletIds)))
+            ->values()
+            ->all();
     }
 
     /**
