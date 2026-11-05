@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Outlet;
+use App\Services\InchasReport;
 use Illuminate\Http\Request;
 
 class AdminDashboardController extends Controller
 {
+    public function __construct(private readonly InchasReport $inchas)
+    {
+    }
+
     public function index(Request $request)
     {
         $admin = $request->user();
@@ -48,6 +53,8 @@ class AdminDashboardController extends Controller
                     'inactive' => $employees->where('is_active', false)->count(),
                 ],
                 'outlet_list' => $outlets->values(),
+                // Rekap Inchas in/out per admin untuk outlet milik admin ini.
+                'inchas' => $this->inchas->build($allowedIds),
             ],
         ]);
     }
