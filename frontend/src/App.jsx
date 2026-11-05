@@ -575,6 +575,8 @@ function Overview({ outlets, admins, setPage, stats, stopmeters = [], stopmeters
       </div>
     </section>
 
+    <InchasPanel data={stats?.inchas} />
+
     {showOutletRanking && (
       <div
         className="growth-modal-backdrop"
@@ -649,6 +651,98 @@ function Overview({ outlets, admins, setPage, stats, stopmeters = [], stopmeters
     )}
   </>;
 }
+function InchasPanel({ data }) {
+  const summary = data?.summary || [];
+  const recent = data?.recent || [];
+  const rm = value => new Intl.NumberFormat('ms-MY', {
+    style: 'currency',
+    currency: 'MYR',
+  }).format(Number(value) || 0);
+
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <div>
+          <h2>Inchas In/Out per Admin</h2>
+          <p>Uang Inchas dicatat atas nama admin (Inchas) yang menangani.</p>
+        </div>
+      </div>
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ADMIN (INCHAS)</th>
+              <th>INCHAS IN</th>
+              <th>INCHAS OUT</th>
+              <th>CATATAN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.map(row => (
+              <tr key={row.admin_id || row.admin_name || 'tanpa-nama'}>
+                <td><b>{row.admin_name || 'Tanpa nama'}</b></td>
+                <td>{rm(row.inch_in)}</td>
+                <td>{rm(row.inch_out)}</td>
+                <td>{row.records}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!summary.length && <div className="empty">Belum ada Inchas in/out yang tercatat.</div>}
+      </div>
+
+      {recent.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13, margin: '18px 0 8px' }}>Catatan terbaru</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>TANGGAL</th>
+                  <th>OUTLET / KARYAWAN</th>
+                  <th>INCHAS IN</th>
+                  <th>INCHAS OUT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map(row => (
+                  <tr key={row.id}>
+                    <td>
+                      <b>{row.operational_date || '-'}</b>
+                      <small className="subcell">{row.session}</small>
+                    </td>
+                    <td>
+                      <b>{row.outlet_name}</b>
+                      <small className="subcell">{row.employee_name}</small>
+                    </td>
+                    <td>
+                      {row.inch_in > 0 ? (
+                        <>
+                          <b>{rm(row.inch_in)}</b>
+                          <small className="subcell">{row.inch_in_admin_name || 'tanpa nama'}</small>
+                        </>
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {row.inch_out > 0 ? (
+                        <>
+                          <b>{rm(row.inch_out)}</b>
+                          <small className="subcell">{row.inch_out_admin_name || 'tanpa nama'}</small>
+                        </>
+                      ) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function Stat({ label, value, meta, icon }) { return <div className="stat"><div className="stat-top"><span>{label}</span><i>{icon}</i></div><strong>{value}</strong><small>{meta}</small></div>; }
 function OutletTable({ outlets, compact, onEdit, onToggle }) {
   return <div className="table-wrap">
@@ -1219,6 +1313,8 @@ function AdminDashboard({ user, onLogout }) {
           </div>
         </section>
       )}
+
+      <InchasPanel data={data?.inchas} />
 
       <section style={{ ...card, marginTop: 25 }}>
         <h2 style={{ marginTop: 0 }}>Outlet Saya</h2>
