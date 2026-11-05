@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiRequest } from './lib/api';
+import { apiRequest, UNAUTHORIZED_EVENT } from './lib/api';
 import EmployeeDashboard from './EmployeeDashboard';
 
 /**
@@ -15,6 +15,19 @@ export default function EmployeeApp() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null);
+      setPassword('');
+      setError('Sesi Anda berakhir. Silakan masuk lagi.');
+      setChecking(false);
+    }
+
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('stopmeter_token');
