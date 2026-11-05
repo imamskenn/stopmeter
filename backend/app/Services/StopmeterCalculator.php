@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\InvalidMeterReadingException;
-
 /**
  * Perhitungan Stopmeter di sisi server.
  *
@@ -21,6 +19,9 @@ use App\Exceptions\InvalidMeterReadingException;
  *   total_limit  = r_used + m_used
  *   sales_net    = total_limit + dp + inch_in - bi - inch_out - vc
  *
+ * Bacaan akhir boleh lebih kecil dari bacaan awal (konfirmasi bisnis
+ * 2026-11-05), jadi r_used/m_used bisa NEGATIF dan tidak di-clamp ke 0.
+ *
  * Ket: total_limit bukan profit. sales_net mencampurkan limit terpakai dengan
  * perpindahan uang Inchas, jadi jangan dipakai sebagai indikator laba/rugi.
  */
@@ -36,18 +37,6 @@ class StopmeterCalculator
         $rCurrent = (int) ($input['r_current'] ?? 0);
         $mInitial = (int) ($input['m_initial'] ?? 0);
         $mCurrent = (int) ($input['m_current'] ?? 0);
-
-        if ($rCurrent < $rInitial) {
-            throw new InvalidMeterReadingException(
-                'Bacaan akhir R tidak boleh lebih kecil dari bacaan awal R.'
-            );
-        }
-
-        if ($mCurrent < $mInitial) {
-            throw new InvalidMeterReadingException(
-                'Bacaan akhir M tidak boleh lebih kecil dari bacaan awal M.'
-            );
-        }
 
         $rUsed = $rCurrent - $rInitial;
         $mUsed = $mCurrent - $mInitial;

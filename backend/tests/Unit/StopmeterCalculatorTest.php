@@ -2,7 +2,6 @@
 
 namespace Tests\Unit;
 
-use App\Exceptions\InvalidMeterReadingException;
 use App\Services\StopmeterCalculator;
 use PHPUnit\Framework\TestCase;
 
@@ -43,16 +42,21 @@ class StopmeterCalculatorTest extends TestCase
         $this->assertSame(250, $result['total_limit']);
     }
 
-    public function test_meter_reading_cannot_decrease(): void
+    public function test_meter_difference_may_be_negative(): void
     {
-        $this->expectException(InvalidMeterReadingException::class);
-
-        (new StopmeterCalculator())->calculate([
+        // Bacaan akhir lebih kecil dari bacaan awal bukan lagi error: selisihnya
+        // dibiarkan minus, bukan di-clamp ke 0.
+        $result = (new StopmeterCalculator())->calculate([
             'r_initial' => 1000,
             'r_current' => 999,
-            'm_initial' => 0,
-            'm_current' => 0,
+            'm_initial' => 50,
+            'm_current' => 40,
         ]);
+
+        $this->assertSame(-1, $result['r_used']);
+        $this->assertSame(-10, $result['m_used']);
+        $this->assertSame(-11, $result['total_limit']);
+        $this->assertSame(-11, $result['sales_net']);
     }
 
     public function test_optional_money_fields_default_to_zero(): void

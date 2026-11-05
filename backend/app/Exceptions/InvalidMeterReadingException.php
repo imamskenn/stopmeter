@@ -5,7 +5,7 @@ namespace App\Exceptions;
 use InvalidArgumentException;
 
 /**
- * Bacaan meter tidak valid (mis. meter akhir lebih kecil dari meter awal).
+ * Bacaan meter tidak valid (mis. bacaan awal wajib diisi tetapi tidak dikirim).
  */
 class InvalidMeterReadingException extends InvalidArgumentException
 {
