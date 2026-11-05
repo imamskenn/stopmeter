@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: var(--app-bg, #f4f4f4);
   color: var(--app-text, #222);
-  padding-bottom: 40px;
+  padding-bottom: 24px;
 }
 
 .emp-page *,
@@ -16,7 +16,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 18px;
+  padding: 14px 16px;
   background: var(--app-sidebar, #191919);
   color: #fff;
 }
@@ -58,18 +58,18 @@
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
-  padding: 18px;
+  padding: 14px;
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .emp-card {
   background: var(--app-surface, #fff);
   border: 1px solid var(--app-border, #e7e7e7);
   border-radius: 16px;
-  padding: 18px;
+  padding: 16px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .emp-card-head {
@@ -115,12 +115,6 @@
   gap: 12px;
 }
 
-.emp-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
 .emp-field {
   display: grid;
   gap: 6px;
@@ -163,7 +157,125 @@
 
 .emp-field textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 44px;
+}
+
+/* Beberapa baris tambahan (DP/BI/Inchas/VC) muncul hanya saat dipilih, jadi
+   form tetap pendek di layar HP. */
+.emp-money {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--app-border, #eee);
+  border-radius: 12px;
+  background: #fbfbfd;
+}
+
+.emp-money-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.emp-money-row {
+  display: grid;
+  grid-template-columns: minmax(74px, auto) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.emp-money-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.emp-money-row input,
+.emp-money-admin select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--app-border, #e2e2e2);
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  font-weight: 500;
+  color: inherit;
+}
+
+.emp-money-row input:disabled,
+.emp-money-admin select:disabled {
+  background: #f7f7f7;
+  color: #999;
+}
+
+.emp-money-admin {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--app-muted, #888);
+}
+
+.emp-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emp-picker-item {
+  border: 1px dashed #cfc5f5;
+  background: #f7f4ff;
+  color: #4c32b2;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.emp-btn-mini {
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: #f1eefc;
+  color: #4c32b2;
+  font-size: 12.5px;
+}
+
+.emp-btn-mini:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.emp-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.emp-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.emp-tight {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--app-muted, #888);
+}
+
+.emp-tight-warn {
+  grid-column: 1 / -1;
+  color: #9a3412;
 }
 
 .emp-meters {
@@ -347,13 +459,68 @@
 }
 
 @media (max-width: 560px) {
-  .emp-header {
-    padding: 16px;
+  .emp-page {
+    padding-bottom: 14px;
   }
 
+  .emp-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 10px 14px;
+  }
+
+  .emp-header h1 {
+    font-size: 17px;
+  }
+
+  .emp-shell {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .emp-card {
+    padding: 13px;
+    gap: 10px;
+    border-radius: 14px;
+  }
+
+  /* Dua kolom tetap dipertahankan supaya form tidak memanjang ke bawah. */
   .emp-row,
-  .emp-grid,
   .emp-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+
+  .emp-meters {
+    padding: 10px;
+    gap: 9px;
+  }
+
+  .emp-meter strong {
+    font-size: 17px;
+  }
+
+  .emp-field input,
+  .emp-field select,
+  .emp-money-row input,
+  .emp-money-admin select {
+    padding: 9px 10px;
+    font-size: 15px;
+  }
+
+  .emp-money {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .emp-submit {
+    position: sticky;
+    bottom: 10px;
+    box-shadow: 0 8px 20px rgba(24, 24, 24, 0.16);
+  }
+
+  .emp-history li {
+    padding: 8px 10px;
   }
 }
