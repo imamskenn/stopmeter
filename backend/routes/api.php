@@ -32,12 +32,19 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
 
-    Route::prefix('stopmeters')
-        ->middleware('role:super_admin,admin,employee')
-        ->group(function () {
+    Route::prefix('stopmeters')->group(function () {
+        // Employee: form Stopmeter shift berjalan + submit final.
+        Route::middleware('role:employee')->group(function () {
+            Route::get('/context', [StopmeterController::class, 'context']);
+            Route::get('/active', [StopmeterController::class, 'active']);
+            Route::post('/', [StopmeterController::class, 'store']);
+        });
+
+        Route::middleware('role:super_admin,admin,employee')->group(function () {
             Route::get('/', [StopmeterController::class, 'index']);
             Route::get('/{id}', [StopmeterController::class, 'show']);
         });
+    });
 
     Route::prefix('management')
         ->middleware('role:super_admin,admin')
