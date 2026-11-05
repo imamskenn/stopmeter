@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from './lib/api';
+import LoadingScreen from './LoadingScreen';
+import AppLayout from './AppLayout';
 
 
 const initialOutlets = [
@@ -25,6 +27,8 @@ function Dashboard({ user, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [outletsLoading, setOutletsLoading] = useState(true);
+  const [stopmeters, setStopmeters] = useState([]);
+  const [stopmetersLoading, setStopmetersLoading] = useState(true);
 
 
   useEffect(() => {
@@ -52,6 +56,13 @@ function Dashboard({ user, onLogout }) {
       .then(response => setDashboardData(response.data))
       .catch(error => console.error('Dashboard API:', error.message))
       .finally(() => setDashboardLoading(false));
+  }, []);
+
+  useEffect(() => {
+    apiRequest('/stopmeters')
+      .then(response => setStopmeters(response.data || []))
+      .catch(error => console.error('Stopmeter API:', error.message))
+      .finally(() => setStopmetersLoading(false));
   }, []);
 
   const [page, setPage] = useState('overview');
@@ -257,25 +268,17 @@ function Dashboard({ user, onLogout }) {
 
   const title = nav.find(n => n[0] === page)?.[1] || 'Ringkasan';
 
-  return <div className="shell">
-    <aside className="sidebar">
-      <div className="brand"><div className="brand-mark">S</div><div><b>STOPMETER</b><small>CONTROL CENTER</small></div></div>
-      <div className="workspace-label">WORKSPACE</div>
-      <nav>{nav.map(([id, label, icon]) =>
-        <button key={id} className={`nav-item ${page === id ? 'active' : ''}`} onClick={() => setPage(id)}>
-          <span className="nav-icon">{icon}</span>{label}
-        </button>
-      )}</nav>
-      <div className="sidebar-bottom"><div className="avatar">D</div><div><b>{user?.name || 'Super Admin'}</b><small>Super Admin</small></div><span className="online-dot" /></div>
-    </aside>
+  return (
+    <AppLayout
+      user={user}
+      role="Super Admin"
+      title={title}
+      nav={nav}
+      activePage={page}
+      onNavigate={setPage}
+      onLogout={onLogout}
+    >
 
-    <main className="main">
-      <header className="topbar">
-        <div><div className="eyebrow">STOPMETER / SUPER ADMIN</div><h1>{title}</h1></div>
-        <div className="top-actions"><span className="system-status"><i /> Terhubung</span><button className="profile">{(user?.name || "S").charAt(0).toUpperCase()}</button><button className="secondary" onClick={onLogout}>Keluar</button></div>
-      </header>
-
-      <div className="content">
         <div className="notice"><span>ⓘ</span>{notice}</div>
         {page === 'overview' && (
           dashboardLoading
@@ -285,6 +288,8 @@ function Dashboard({ user, onLogout }) {
                 admins={admins}
                 setPage={setPage}
                 stats={dashboardData}
+                stopmeters={stopmeters}
+                stopmetersLoading={stopmetersLoading}
               />
         )}
         {page === 'outlets' && <section className="panel">
@@ -363,8 +368,9 @@ function Dashboard({ user, onLogout }) {
             </div>
           </>}
         </section>}
-      </div>
-    </main>
+
+
+
 
     {showAdd && <div className="modal-backdrop" onClick={() => setShowAdd(false)}><form className="modal" onSubmit={addOutlet} onClick={e => e.stopPropagation()}><div className="modal-head"><div><h2>Tambah outlet</h2><p>Outlet baru akan masuk ke daftar pengelolaan.</p></div><button type="button" className="close" onClick={() => setShowAdd(false)}>×</button></div><label>Nama outlet<input autoFocus value={newOutlet.name} onChange={e => setNewOutlet({ ...newOutlet, name: e.target.value })} placeholder="Contoh: Outlet Utara" required /></label><label>Kode outlet<input value={newOutlet.code} onChange={e => setNewOutlet({ ...newOutlet, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') })} placeholder="Contoh: KL-001" required /></label><label>Alamat / lokasi<input value={newOutlet.city} onChange={e => setNewOutlet({ ...newOutlet, city: e.target.value })} placeholder="Alamat outlet (opsional)" /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setShowAdd(false)}>Batal</button><button className="primary">Simpan outlet</button></div></form></div>}
 
@@ -438,23 +444,204 @@ function Dashboard({ user, onLogout }) {
         </div>
       </form>
     </div>}
-  </div>;
+    </AppLayout>
+  );
 }
 
-function Overview({ outlets, admins, setPage, stats }) {
-  const active = outlets.filter(o => o.status === 'Aktif').length;
+function Overview({ outlets, admins, setPage, stats, stopmeters = [], stopmetersLoading = false }) {
+  const [showOutletRanking, setShowOutletRanking] = useState(false);
+
+  const now = new Date();
+  const monthName = now.toLocaleDateString('id-ID', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const lastDay = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0
+  ).getDate();
+
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const monthlyRecords = stopmeters.filter(record => {
+    const date = String(record.operational_date || '');
+    return date.slice(0, 7) === monthKey;
+  });
+
+  const outletRankings = outlets.map(outlet => {
+    const records = monthlyRecords.filter(record =>
+      String(record.outlet_id) === String(outlet.id)
+    );
+
+    return {
+      ...outlet,
+      biTotal: records.reduce((sum, record) => {
+        const value = Number(record.bi || 0);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0),
+      recordCount: records.length,
+    };
+  });
+
+  const formatBI = value => new Intl.NumberFormat('id-ID').format(value);
+
+  const getOutletBadges = outlet => {
+    const others = outletRankings.filter(item => item.id !== outlet.id);
+    const averageOtherBI = others.length
+      ? others.reduce((sum, item) => sum + item.biTotal, 0) / others.length
+      : 0;
+
+    return {
+      bi: others.length > 0 && outlet.biTotal > averageOtherBI,
+      up: false,
+      growth: false,
+    };
+  };
+
   return <>
-    <div className="welcome"><div><span className="welcome-tag">SYSTEM OVERVIEW</span><h2>Kontrol seluruh operasional.</h2><p>Pantau outlet, pengelola, dan kesiapan sistem Stopmeter dari satu tempat.</p></div><div className="welcome-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="core">S</div></div></div>
+    <div className="welcome">
+      <div>
+        <span className="welcome-tag">SYSTEM OVERVIEW</span>
+        <h2>Kontrol seluruh operasional.</h2>
+        <p>Pantau outlet, pengelola, dan kesiapan sistem Stopmeter dari satu tempat.</p>
+      </div>
+      <div className="welcome-art">
+        <div className="orbit orbit-one"/>
+        <div className="orbit orbit-two"/>
+        <div className="core">S</div>
+      </div>
+    </div>
+
     <div className="stats">
       <Stat label="TOTAL OUTLET" value={stats?.outlets?.total ?? 0} meta={`${stats?.outlets?.active ?? 0} outlet aktif`} icon="⌂" />
       <Stat label="ADMIN INCHAS" value={stats?.admins?.total ?? 0} meta={`${stats?.admins?.active ?? 0} akun aktif`} icon="♙" />
       <Stat label="KARYAWAN" value={stats?.employees?.total ?? 0} meta={`${stats?.employees?.active ?? 0} karyawan aktif`} icon="♧" />
       <Stat label="STATUS SISTEM" value="Online" meta="API terhubung" icon="◉" />
     </div>
-    <div className="lower-grid">
-      <section className="panel"><div className="panel-head"><div><h2>Outlet terbaru</h2><p>Daftar outlet yang dikelola.</p></div><button className="text-button" onClick={() => setPage('outlets')}>Lihat semua →</button></div><OutletTable outlets={outlets.slice(0, 4)} compact /></section>
-      <section className="panel"><div className="panel-head"><div><h2>Akses sistem</h2><p>Struktur peran pengguna.</p></div></div><div className="access-list"><div><span className="access-icon purple">D</span><div><b>Super Admin</b><small>Kontrol seluruh sistem</small></div><strong>Full</strong></div><div><span className="access-icon blue">A</span><div><b>Admin (Inchas)</b><small>Kelola outlet & karyawan</small></div><strong>Outlet</strong></div><div><span className="access-icon amber">K</span><div><b>Karyawan</b><small>Input Stopmeter</small></div><strong>Terbatas</strong></div></div></section>
-    </div>
+
+    <section className="panel outlet-growth-panel">
+      <div className="panel-head outlet-growth-heading">
+        <div>
+          <span className="growth-eyebrow">PERFORMA OPERASIONAL</span>
+          <h2>Performa Outlet</h2>
+          <p>Lencana performa setiap outlet bulan ini.</p>
+        </div>
+        <span className="growth-period">
+          {`01–${lastDay} ${monthName}`}
+        </span>
+      </div>
+
+      <div className="growth-modal-notice">
+        {stopmetersLoading
+          ? 'Memuat data Stopmeter...'
+          : 'Data sementara: API hanya mengirim maksimal 100 record Stopmeter terbaru. Peringkat bulanan bisa belum lengkap.'}
+      </div>
+
+      <div className="outlet-badge-list">
+        {outletRankings.map(outlet => {
+          const badges = getOutletBadges(outlet);
+          return (
+            <div className="outlet-badge-row" key={outlet.id}>
+              <div className="outlet-badge-name">
+                <strong>{outlet.name}</strong>
+                <small>{outlet.city || 'Lokasi belum diatur'}</small>
+              </div>
+              <div className="outlet-badges">
+                {badges.bi && <span className="outlet-icon-badge badge-bi" title="BI Teratas">♛</span>}
+                {badges.up && <span className="outlet-icon-badge badge-up" title="Penambahan Limit">↑</span>}
+                {badges.growth && <span className="outlet-icon-badge badge-growth" title="Naik Daun">↗</span>}
+              </div>
+            </div>
+          );
+        })}
+        {!outlets.length && <p className="growth-ranking-empty">Belum ada outlet.</p>}
+      </div>
+
+      <div className="growth-footer">
+        <span>{outlets.length} outlet terdaftar</span>
+        <button
+          type="button"
+          className="growth-detail-button"
+          onClick={() => setShowOutletRanking(true)}
+        >
+          Lihat seluruh outlet <span>→</span>
+        </button>
+      </div>
+    </section>
+
+    {showOutletRanking && (
+      <div
+        className="growth-modal-backdrop"
+        onClick={() => setShowOutletRanking(false)}
+      >
+        <section
+          className="growth-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="growth-modal-title"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="growth-modal-header">
+            <div>
+              <span className="growth-eyebrow">PERFORMA BULANAN</span>
+              <h2 id="growth-modal-title">Seluruh Outlet</h2>
+              <p>{`Periode 01–${lastDay} ${monthName}`}</p>
+            </div>
+            <button
+              type="button"
+              className="growth-modal-close"
+              onClick={() => setShowOutletRanking(false)}
+              aria-label="Tutup"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="growth-modal-notice">
+            Data sementara dari maksimal 100 record Stopmeter terbaru. Angka bulanan mungkin belum lengkap.
+          </div>
+
+          <div className="growth-outlet-list">
+            {byBI.length ? byBI.map((outlet, index) => (
+              <div className="growth-outlet-row" key={outlet.id}>
+                <div className="growth-outlet-symbol">{index + 1}</div>
+                <div className="growth-outlet-info">
+                  <strong>{outlet.name}</strong>
+                  <small>{outlet.city || 'Lokasi belum diatur'}</small>
+                  <small>BI: {formatBI(outlet.biTotal)} · Catatan: {outlet.recordCount}</small>
+                </div>
+                <span className={`status ${outlet.status === 'Aktif' ? 'active' : 'inactive'}`}>
+                  {outlet.status}
+                </span>
+              </div>
+            )) : (
+              <div className="empty">Belum ada outlet terdaftar.</div>
+            )}
+          </div>
+
+          <div className="growth-modal-footer">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setShowOutletRanking(false)}
+            >
+              Tutup
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setShowOutletRanking(false);
+                setPage('outlets');
+              }}
+            >
+              Manajemen outlet
+            </button>
+          </div>
+        </section>
+      </div>
+    )}
   </>;
 }
 function Stat({ label, value, meta, icon }) { return <div className="stat"><div className="stat-top"><span>{label}</span><i>{icon}</i></div><strong>{value}</strong><small>{meta}</small></div>; }
@@ -1435,9 +1622,7 @@ function App() {
   }
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-      Memeriksa sesi...
-    </div>;
+    return <LoadingScreen />;
   }
 
   if (!user) {

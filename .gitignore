@@ -1,0 +1,16 @@
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Generated files
+node_modules/
+dist/
+vendor/
+
+# Local backups
+*.bak
+*.backup
+*-backup*
+*.before-*
