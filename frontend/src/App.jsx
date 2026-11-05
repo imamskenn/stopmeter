@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from './lib/api';
 import LoadingScreen from './LoadingScreen';
 import AppLayout from './AppLayout';
+import EmployeeApp from './EmployeeApp';
 
 
 const initialOutlets = [
@@ -1565,10 +1566,6 @@ function App() {
       .then(response => {
         const account = response.user || response.data?.user || response.data;
 
-        if (!['super_admin', 'admin'].includes(account?.role)) {
-          throw new Error('Role akun belum memiliki akses frontend.');
-        }
-
         setUser(account);
       })
       .catch(() => {
@@ -1596,7 +1593,7 @@ function App() {
         throw new Error('Format respons login tidak sesuai.');
       }
 
-      if (!['super_admin', 'admin'].includes(account.role)) {
+      if (!['super_admin', 'admin', 'employee'].includes(account.role)) {
         throw new Error('Role akun belum memiliki akses frontend.');
       }
 
@@ -1685,7 +1682,15 @@ function App() {
     return <Dashboard user={user} onLogout={handleLogout} />;
   }
 
-  return <AdminDashboard user={user} onLogout={handleLogout} />;
+  if (user.role === 'admin') {
+    return <AdminDashboard user={user} onLogout={handleLogout} />;
+  }
+
+  if (user.role === 'employee') {
+    return <EmployeeApp user={user} onLogout={handleLogout} />;
+  }
+
+  return null;
 }
 
 export default App;
