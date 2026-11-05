@@ -1,0 +1,38 @@
+name: freebuff-sync
+
+on:
+  push:
+    paths:
+      - '.github/freebuff-sync/apply.py'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cek apakah patch masih perlu dijalankan
+        id: check
+        run: |
+          if [ -f .github/freebuff-sync/apply.py ]; then
+            echo "go=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terapkan patch byBI
+        if: steps.check.outputs.go == '1'
+        run: python3 .github/freebuff-sync/apply.py
+
+      - name: Commit dan push ke main
+        if: steps.check.outputs.go == '1'
+        run: |
+          git config user.name "freebuff-sync"
+          git config user.email "freebuff-sync@users.noreply.github.com"
+          rm -rf .github/freebuff-sync .github/workflows/freebuff-sync.yml
+          git add -A
+          git commit -m "Perbaiki crash byBI di modal Seluruh Outlet"
+          git push origin HEAD:main
