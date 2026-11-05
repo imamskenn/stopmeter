@@ -28,6 +28,8 @@ const emptyForm = {
   bi: '',
   inch_in: '',
   inch_out: '',
+  inch_in_admin_id: '',
+  inch_out_admin_id: '',
   notes: '',
 };
 
@@ -35,6 +37,17 @@ const toNumber = value => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+// Tambahan di bawah bacaan akhir. Tidak ditampilkan semua sekaligus supaya
+// form tidak memanjang ke bawah; employee menambah hanya yang dipakai.
+// Inchas in/out wajib menyebut admin (Inchas) yang menangani uangnya.
+const MONEY_FIELDS = [
+  { key: 'dp', label: 'DP' },
+  { key: 'bi', label: 'BI (bank in)' },
+  { key: 'inch_in', label: 'Inchas in', adminField: 'inch_in_admin_id' },
+  { key: 'inch_out', label: 'Inchas out', adminField: 'inch_out_admin_id' },
+  { key: 'vc', label: 'VC' },
+];
 
 export default function EmployeeDashboard({ user, onLogout }) {
   const [context, setContext] = useState(null);
@@ -48,6 +61,9 @@ export default function EmployeeDashboard({ user, onLogout }) {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState('');
+
+  const [moneyFields, setMoneyFields] = useState([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [receipt, setReceipt] = useState(null);
   const [history, setHistory] = useState([]);
@@ -106,6 +122,12 @@ export default function EmployeeDashboard({ user, onLogout }) {
     [outlets, outletId]
   );
 
+  // Admin (Inchas) yang ditugaskan pada outlet yang sedang dipilih.
+  const outletAdmins = useMemo(() => {
+    const admins = context?.admins || [];
+    return admins.filter(admin => (admin.outlet_ids || []).includes(outletId));
+  }, [context, outletId]);
+
   const requiresInitial = active?.requires_initial_readings ?? outlet?.requires_initial_readings ?? false;
   const alreadySubmitted = active?.already_submitted === true;
   const locked = alreadySubmitted || submitting;
@@ -117,6 +139,34 @@ export default function EmployeeDashboard({ user, onLogout }) {
     setForm(current => ({ ...current, [field]: value }));
   }
 
+  function changeOutlet(value) {
+    // Admin terpilih bisa berbeda per outlet, jadi pilihan Inchas direset.
+    setOutletId(value);
+    setForm(current => ({ ...current, inch_in_admin_id: '', inch_out_admin_id: '' }));
+  }
+
+  function addMoneyField(key) {
+    setMoneyFields(current => (current.includes(key) ? current : [...current, key]));
+    setPickerOpen(false);
+  }
+
+  function removeMoneyField(key) {
+    const field = MONEY_FIELDS.find(row => row.key === key);
+
+    setMoneyFields(current => current.filter(row => row !== key));
+    setForm(current => ({
+      ...current,
+      [key]: '',
+      ...(field?.adminField ? { [field.adminField]: '' } : {}),
+    }));
+  }
+
+  function inchasError(fieldKey, adminField, label) {
+    if (!moneyFields.includes(fieldKey) || toNumber(form[fieldKey]) <= 0) return '';
+
+    return form[adminField] ? '' : `Pilih admin (Inchas) yang menangani ${label}.`;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
@@ -124,6 +174,14 @@ export default function EmployeeDashboard({ user, onLogout }) {
 
     if (form.r_current === '' || form.m_current === '') {
       setFormError('Bacaan akhir R dan M wajib diisi.');
+      return;
+    }
+
+    const inchasMessage = inchasError('inch_in', 'inch_in_admin_id', 'Inchas in')
+      || inchasError('inch_out', 'inch_out_admin_id', 'Inchas out');
+
+    if (inchasMessage) {
+      setFormError(inchasMessage);
       return;
     }
 
@@ -144,6 +202,14 @@ export default function EmployeeDashboard({ user, onLogout }) {
       inch_out: toNumber(form.inch_out),
     };
 
+    if (toNumber(form.inch_in) > 0 && form.inch_in_admin_id) {
+      payload.inch_in_admin_id = form.inch_in_admin_id;
+    }
+
+    if (toNumber(form.inch_out) > 0 && form.inch_out_admin_id) {
+      payload.inch_out_admin_id = form.inch_out_admin_id;
+    }
+
     if (form.notes.trim()) payload.notes = form.notes.trim();
     if (requiresInitial) {
       payload.r_initial = toNumber(form.r_initial);
@@ -161,6 +227,8 @@ export default function EmployeeDashboard({ user, onLogout }) {
 
       setReceipt(response.data || null);
       setForm(emptyForm);
+      setMoneyFields([]);
+      setPickerOpen(false);
       setIdempotencyKey('');
       loadHistory();
     } catch (err) {
@@ -222,7 +290,7 @@ export default function EmployeeDashboard({ user, onLogout }) {
                   <span>Outlet</span>
                   <select
                     value={outletId}
-                    onChange={e => setOutletId(e.target.value)}
+                    onChange={e => changeOutlet(e.target.value)}
                     disabled={submitting}
                   >
                     {outlets.map(row => (
@@ -325,42 +393,94 @@ export default function EmployeeDashboard({ user, onLogout }) {
                 </label>
               </div>
 
-              <div className="emp-grid">
-                <label className="emp-field">
-                  <span>DP</span>
-                  <input type="number" min="0" inputMode="numeric" value={form.dp}
-                    onChange={e => updateField('dp', e.target.value)} disabled={locked} placeholder="0" />
-                </label>
+              <div className="emp-money">
+                <div className="emp-money-head">
+                  <strong>Tambahan</strong>
+                  <button
+                    type="button"
+                    className="emp-btn emp-btn-mini"
+                    onClick={() => setPickerOpen(open => !open)}
+                    disabled={locked || moneyFields.length === MONEY_FIELDS.length}
+                  >
+                    {pickerOpen ? 'Batal' : '+ Tambah'}
+                  </button>
+                </div>
 
-                <label className="emp-field">
-                  <span>VC</span>
-                  <input type="number" min="0" inputMode="numeric" value={form.vc}
-                    onChange={e => updateField('vc', e.target.value)} disabled={locked} placeholder="0" />
-                </label>
+                {pickerOpen && (
+                  <div className="emp-picker">
+                    {MONEY_FIELDS
+                      .filter(field => !moneyFields.includes(field.key))
+                      .map(field => (
+                        <button
+                          key={field.key}
+                          type="button"
+                          className="emp-picker-item"
+                          onClick={() => addMoneyField(field.key)}
+                        >
+                          {field.label}
+                        </button>
+                      ))}
+                  </div>
+                )}
 
-                <label className="emp-field">
-                  <span>BI (bank in)</span>
-                  <input type="number" min="0" inputMode="numeric" value={form.bi}
-                    onChange={e => updateField('bi', e.target.value)} disabled={locked} placeholder="0" />
-                </label>
+                {moneyFields.length === 0 && !pickerOpen && (
+                  <p className="emp-tight">Belum ada tambahan.</p>
+                )}
 
-                <label className="emp-field">
-                  <span>Inch in</span>
-                  <input type="number" min="0" inputMode="numeric" value={form.inch_in}
-                    onChange={e => updateField('inch_in', e.target.value)} disabled={locked} placeholder="0" />
-                </label>
+                {moneyFields.map(key => {
+                  const field = MONEY_FIELDS.find(row => row.key === key);
 
-                <label className="emp-field">
-                  <span>Inch out</span>
-                  <input type="number" min="0" inputMode="numeric" value={form.inch_out}
-                    onChange={e => updateField('inch_out', e.target.value)} disabled={locked} placeholder="0" />
-                </label>
+                  return (
+                    <div className="emp-money-row" key={key}>
+                      <span className="emp-money-label">{field.label}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={form[key]}
+                        onChange={e => updateField(key, e.target.value)}
+                        disabled={locked}
+                      />
+                      <button
+                        type="button"
+                        className="emp-link"
+                        onClick={() => removeMoneyField(key)}
+                        disabled={locked}
+                      >
+                        Hapus
+                      </button>
+
+                      {field.adminField && (
+                        <label className="emp-money-admin">
+                          <span>Admin (Inchas) yang menangani</span>
+                          <select
+                            value={form[field.adminField]}
+                            onChange={e => updateField(field.adminField, e.target.value)}
+                            disabled={locked || outletAdmins.length === 0}
+                          >
+                            <option value="">Pilih nama admin</option>
+                            {outletAdmins.map(admin => (
+                              <option key={admin.id} value={admin.id}>{admin.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+
+                      {field.adminField && outletAdmins.length === 0 && (
+                        <p className="emp-tight emp-tight-warn">
+                          Belum ada admin (Inchas) yang ditugaskan di outlet ini.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <label className="emp-field">
                 <span>Catatan</span>
                 <textarea
-                  rows={2}
+                  rows={1}
                   maxLength={500}
                   value={form.notes}
                   onChange={e => updateField('notes', e.target.value)}
@@ -369,14 +489,14 @@ export default function EmployeeDashboard({ user, onLogout }) {
                 />
               </label>
 
-              <p className="emp-note">
-                BI adalah bank in (customer transfer langsung ke office) dan mengurangi penjualan bersih.
+              <p className="emp-tight">
+                BI (bank in) mengurangi sales net. Selisih R/M boleh minus bila bacaan akhir lebih kecil.
                 Total dihitung di server setelah submit.
               </p>
 
               {formError && <p className="emp-note emp-note-error">{formError}</p>}
 
-              <button type="submit" className="emp-btn emp-btn-primary" disabled={locked}>
+              <button type="submit" className="emp-btn emp-btn-primary emp-submit" disabled={locked}>
                 {submitting ? 'Menyimpan...' : 'Submit & Finalisasi'}
               </button>
             </form>
@@ -398,8 +518,20 @@ export default function EmployeeDashboard({ user, onLogout }) {
                   <div><dt>M</dt><dd>{receipt.m_initial} → {receipt.m_current} ({receipt.m_used})</dd></div>
                   <div><dt>DP</dt><dd>{money(receipt.dp)}</dd></div>
                   <div><dt>BI</dt><dd>{money(receipt.bi)}</dd></div>
-                  <div><dt>Inch in</dt><dd>{money(receipt.inch_in)}</dd></div>
-                  <div><dt>Inch out</dt><dd>{money(receipt.inch_out)}</dd></div>
+                  <div>
+                    <dt>Inchas in</dt>
+                    <dd>
+                      {money(receipt.inch_in)}
+                      {receipt.inch_in_admin_name ? ` · ${receipt.inch_in_admin_name}` : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Inchas out</dt>
+                    <dd>
+                      {money(receipt.inch_out)}
+                      {receipt.inch_out_admin_name ? ` · ${receipt.inch_out_admin_name}` : ''}
+                    </dd>
+                  </div>
                   <div><dt>VC</dt><dd>{money(receipt.vc)}</dd></div>
                 </dl>
               </div>
