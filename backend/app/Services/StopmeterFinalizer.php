@@ -11,6 +11,7 @@ use App\Support\ActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -81,8 +82,11 @@ class StopmeterFinalizer
             );
         }
 
+        // Nama admin (Inchas) diambil di luar transaksi: hanya baca data user.
+        $inchas = $this->resolveInchas($outletId, $data);
+
         return DB::connection('mongodb')->transaction(
-            function () use ($employee, $employeeId, $outletId, $session, $operationalDate, $data, $idempotencyKey): Stopmeter {
+            function () use ($employee, $employeeId, $outletId, $session, $operationalDate, $data, $idempotencyKey, $inchas): Stopmeter {
                 $state = OutletMeterState::where('outlet_id', $outletId)->first();
 
                 if ($state) {
@@ -121,6 +125,7 @@ class StopmeterFinalizer
                     $operationalDate,
                     $result,
                     $data,
+                    $inchas,
                     $idempotencyKey
                 );
 
@@ -155,6 +160,7 @@ class StopmeterFinalizer
     /**
      * @param  array<string, int>  $result
      * @param  array<string, mixed>  $data
+     * @param  array<string, string|null>  $inchas
      */
     private function storeFinalRecord(
         User $employee,
@@ -164,6 +170,7 @@ class StopmeterFinalizer
         Carbon $operationalDate,
         array $result,
         array $data,
+        array $inchas,
         ?string $idempotencyKey
     ): Stopmeter {
         try {
@@ -186,6 +193,10 @@ class StopmeterFinalizer
                 'vc' => $result['vc'],
                 'inch_in' => $result['inch_in'],
                 'inch_out' => $result['inch_out'],
+                'inch_in_admin_id' => $inchas['inch_in_admin_id'],
+                'inch_in_admin_name' => $inchas['inch_in_admin_name'],
+                'inch_out_admin_id' => $inchas['inch_out_admin_id'],
+                'inch_out_admin_name' => $inchas['inch_out_admin_name'],
                 'sales_net' => $result['sales_net'],
                 'notes' => $data['notes'] ?? null,
                 'finalized_at' => now(),
@@ -263,6 +274,63 @@ class StopmeterFinalizer
                 'Meter outlet berubah saat proses submit. Muat ulang lalu submit ulang.'
             );
         }
+    }
+
+    /**
+     * Pasangan admin (Inchas) untuk Inchas in & out.
+     *
+     * Admin hanya boleh dipakai bila aktif dan memang ditugaskan pada outlet
+     * yang sama dengan employee, supaya nama yang tercatat bisa dipertanggung
+     * jawabkan. Nominal > 0 tanpa admin ditolak.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string|null>
+     */
+    private function resolveInchas(string $outletId, array $data): array
+    {
+        return array_merge(
+            $this->resolveInchasField('inch_in', $outletId, $data),
+            $this->resolveInchasField('inch_out', $outletId, $data)
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, string|null>
+     */
+    private function resolveInchasField(string $field, string $outletId, array $data): array
+    {
+        $label = $field === 'inch_in' ? 'Inchas in' : 'Inchas out';
+        $amount = (int) ($data[$field] ?? 0);
+        $adminId = trim((string) ($data["{$field}_admin_id"] ?? ''));
+
+        if ($adminId === '') {
+            if ($amount > 0) {
+                throw ValidationException::withMessages([
+                    "{$field}_admin_id" => "Pilih admin (Inchas) yang menangani {$label}.",
+                ]);
+            }
+
+            return ["{$field}_admin_id" => null, "{$field}_admin_name" => null];
+        }
+
+        // Id yang bukan ObjectId valid ditolak lebih dulu, supaya driver MongoDB
+        // tidak melempar error 500 saat query.
+        $admin = preg_match('/^[a-f0-9]{24}$/i', $adminId) === 1
+            ? User::where('_id', $adminId)->where('role', 'admin')->first()
+            : null;
+        $adminOutlets = array_map('strval', $admin?->outlet_ids ?? []);
+
+        if ($admin === null || $admin->is_active === false || ! in_array($outletId, $adminOutlets, true)) {
+            throw ValidationException::withMessages([
+                "{$field}_admin_id" => "Admin (Inchas) untuk {$label} tidak valid atau tidak ditugaskan di outlet ini.",
+            ]);
+        }
+
+        return [
+            "{$field}_admin_id" => (string) $admin->_id,
+            "{$field}_admin_name" => (string) $admin->name,
+        ];
     }
 
     private function ensureEmployeeAssignedToOutlet(User $employee, string $outletId): void
