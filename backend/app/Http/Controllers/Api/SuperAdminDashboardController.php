@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Outlet;
+use App\Services\InchasReport;
 use Carbon\Carbon;
 
 class SuperAdminDashboardController extends Controller
 {
+    public function __construct(private readonly InchasReport $inchas)
+    {
+    }
+
     public function index()
     {
         $admins = User::where('role', 'admin');
@@ -77,6 +82,9 @@ class SuperAdminDashboardController extends Controller
                     'period' => '6_months',
                     'monthly' => $growth,
                 ],
+
+                // Rekap Inchas in/out per admin untuk seluruh outlet.
+                'inchas' => $this->inchas->build(null),
             ],
         ]);
     }
