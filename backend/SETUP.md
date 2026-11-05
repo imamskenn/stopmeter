@@ -44,3 +44,23 @@ Keep secrets only in Railway variables. Never expose MongoDB credentials to Reac
 6. Only finalization/closing commits ending R/M readings as the next shift's initial readings. Printing a preview must not advance meter state.
 7. Use atomic/transactional update or optimistic version checks for meter carry-forward to prevent concurrent finalization conflicts.
 8. Disabling/deleting an outlet must preserve historical records.
+
+## Data demo untuk pengujian
+
+```bash
+php artisan db:seed                        # lokal
+php artisan db:seed --class=DemoDataSeeder --force   # APP_ENV=production
+DEMO_PASSWORD='PasswordSendiri123' php artisan db:seed --class=DemoDataSeeder
+```
+
+Yang dibuat (idempoten, aman dijalankan ulang):
+
+| Peran | Email |
+| --- | --- |
+| admin | `admin.demo@stopmeter.test` |
+| employee | `employee.demo@stopmeter.test` |
+
+- Outlet: **Outlet Demo Utama** dengan kode `OUT-DEMO`.
+- Baseline meter outlet: R `1000`, M `500` (hanya dibuat kalau outlet belum punya state, jadi tidak mereset meter yang sudah berjalan).
+- Password awal hanya dipakai saat akun pertama kali dibuat; seeder ulang tidak mengubah password. Isi env `DEMO_PASSWORD` untuk mengganti password awal.
+- Hapus atau nonaktifkan akun demo ini sebelum dipakai sungguhan.
