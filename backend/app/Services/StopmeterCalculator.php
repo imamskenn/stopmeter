@@ -7,12 +7,13 @@ use App\Exceptions\InvalidMeterReadingException;
 /**
  * Perhitungan Stopmeter di sisi server.
  *
- * ATURAN:
+ * ATURAN (konfirmasi bisnis 2026-11-05):
  * - Satu Stopmeter = satu shift (Pagi/Malam) milik satu employee pada satu outlet.
  * - R/M awal TIDAK diinput employee; nilainya diambil dari state meter outlet
  *   (hasil finalisasi shift sebelumnya). Employee hanya mengisi bacaan akhir.
  * - BI = bank in: uang yang ditransfer customer langsung ke office.
- *   Dicatat sebagai angka POSITIF dan MENGURANGI sales_net.
+ *   Dicatat sebagai angka POSITIF dan MENGURANGI sales_net, sesuai contoh
+ *   perhitungan yang sudah tampil di aplikasi.
  *
  * Rumus:
  *   r_used       = r_current - r_initial
